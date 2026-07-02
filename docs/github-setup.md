@@ -11,7 +11,7 @@ Ez a repo helyben már kész, de a GitHub oldali automatizmusokhoz a következő
 Példa:
 
 ```bash
-git remote add origin git@github.com:<ORG>/pay-api-app.git
+git remote add origin git@github.com:joemeszaros/devops-pay-api-app.git
 git add .
 git commit -m "feat: bootstrap pay-api app"
 git push -u origin main
@@ -43,7 +43,7 @@ Javasolt értékek:
 
 - `AWS_REGION=eu-central-1`
 - `ECR_REPOSITORY=pay-api`
-- `GITOPS_REPOSITORY=<ORG>/pay-api-gitops`
+- `GITOPS_REPOSITORY=joemeszaros/devops-pay-api-gitops`
 - `GITOPS_VALUES_FILE=apps/pay-api-prod/values-prod.yaml`
 
 ## 5. Secrets
