@@ -1,0 +1,112 @@
+name: pay-api Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pay-api-release-prod
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: prod
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      GITOPS_REPOSITORY: ${{ vars.GITOPS_REPOSITORY }}
+      GITOPS_VALUES_FILE: ${{ vars.GITOPS_VALUES_FILE }}
+
+    steps:
+      - name: Checkout app repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure AWS credentials from GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}"
+          docker build -t "${IMAGE_URI}:${IMAGE_TAG}" .
+          docker push "${IMAGE_URI}:${IMAGE_TAG}"
+          DIGEST="$(aws ecr describe-images \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+          echo "repository=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPOSITORY }}
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          path: gitops
+
+      - name: Update GitOps values file
+        working-directory: gitops
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          VALUES_FILE: ${{ env.GITOPS_VALUES_FILE }}
+        run: |
+          set -euo pipefail
+          test -n "${VALUES_FILE}"
+          sed -i.bak -E "s#(^  repository: ).*#\\1${IMAGE_REPOSITORY}#" "${VALUES_FILE}"
+          sed -i.bak -E "s#(^  digest: ).*#\\1${IMAGE_DIGEST}#" "${VALUES_FILE}"
+          rm -f "${VALUES_FILE}.bak"
+
+      - name: Create promotion pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          path: gitops
+          commit-message: "chore(pay-api): promote image ${{ steps.image.outputs.tag }}"
+          branch: "promote/pay-api-${{ steps.image.outputs.tag }}"
+          delete-branch: true
+          title: "Promote pay-api image ${{ steps.image.outputs.tag }} to prod"
+          body: |
+            Automated promotion from the application repository.
+
+            - repository: `${{ steps.image.outputs.repository }}`
+            - digest: `${{ steps.image.outputs.digest }}`

@@ -1,0 +1,25 @@
+{
+  "name": "pay-api-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simplified pay-api sample for Chapter 12 DevOps workflows.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "tsc -p tsconfig.check.json --noEmit",
+    "test": "node --import tsx --test"
+  },
+  "dependencies": {
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
