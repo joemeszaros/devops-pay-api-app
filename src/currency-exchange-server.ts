@@ -4,7 +4,7 @@ import {
   recordCurrencyExchangeHttpRequest,
   renderCurrencyExchangeMetrics
 } from "./currency-exchange-metrics.js";
-import { resolveRateToEur } from "./currency-exchange-rates.js";
+import { resolveExchangeRate } from "./currency-exchange-rates.js";
 
 const convertQuerySchema = {
   querystring: {
@@ -13,7 +13,7 @@ const convertQuerySchema = {
     required: ["from", "to", "amountMinor"],
     properties: {
       from: { type: "string", pattern: "^[A-Z]{3}$" },
-      to: { type: "string", const: "EUR" },
+      to: { type: "string", pattern: "^[A-Z]{3}$" },
       amountMinor: { type: "integer", minimum: 1 }
     }
   }
@@ -21,7 +21,7 @@ const convertQuerySchema = {
 
 interface ConvertQuery {
   from: string;
-  to: "EUR";
+  to: string;
   amountMinor: number;
 }
 
@@ -63,7 +63,7 @@ export function createCurrencyExchangeServer(
     async (request) => {
       recordCurrencyExchangeConversion();
 
-      const exchangeRate = resolveRateToEur(request.query.from);
+      const exchangeRate = resolveExchangeRate(request.query.from, request.query.to);
       const targetAmountMinor = Math.round(request.query.amountMinor * exchangeRate);
 
       return {
