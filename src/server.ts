@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { buildQuote, type PaymentQuoteRequest } from "./installments.js";
 import { recordHttpRequest, recordPaymentQuoteRequest, renderMetrics } from "./metrics.js";
 
@@ -27,9 +28,21 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
       level: options.logLevel
     }
   });
+  const tracer = trace.getTracer("pay-api");
 
   server.addHook("onRequest", async () => {
     recordHttpRequest();
+  });
+
+  server.addHook("onSend", async (_request, reply, payload) => {
+    const activeSpan = trace.getActiveSpan();
+    const traceId = activeSpan?.spanContext().traceId;
+
+    if (traceId !== undefined) {
+      reply.header("x-trace-id", traceId);
+    }
+
+    return payload;
   });
 
   server.get("/health", async () => ({
@@ -50,13 +63,37 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
     "/payments/quote",
     { schema: paymentQuoteSchema },
     async (request) => {
-      recordPaymentQuoteRequest();
+      return tracer.startActiveSpan("quote.calculate", async (span) => {
+        try {
+          recordPaymentQuoteRequest();
+          span.setAttributes({
+            "pay-api.amount_minor": request.body.amountMinor,
+            "pay-api.currency": request.body.currency,
+            "pay-api.installments": request.body.installments
+          });
 
-      return buildQuote(
-        request.body,
-        randomUUID(),
-        new Date().toISOString()
-      );
+          const quote = buildQuote(
+            request.body,
+            randomUUID(),
+            new Date().toISOString()
+          );
+
+          span.setAttributes({
+            "pay-api.approved": quote.approved,
+            "pay-api.request_id": quote.requestId
+          });
+
+          return quote;
+        } catch (error) {
+          span.recordException(error as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR
+          });
+          throw error;
+        } finally {
+          span.end();
+        }
+      });
     }
   );
 
