@@ -21,3 +21,10 @@ function buildFallbackRate(currency: string): number {
 export function resolveRateToEur(currency: string): number {
   return KNOWN_RATES_TO_EUR[currency] ?? buildFallbackRate(currency);
 }
+
+export function resolveExchangeRate(sourceCurrency: string, targetCurrency: string): number {
+  const sourceToEur = resolveRateToEur(sourceCurrency);
+  const targetToEur = resolveRateToEur(targetCurrency);
+
+  return Number((sourceToEur / targetToEur).toFixed(6));
+}

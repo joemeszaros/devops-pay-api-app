@@ -3,7 +3,7 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 export interface CurrencyConversionResult {
   sourceCurrency: string;
   sourceAmountMinor: number;
-  targetCurrency: "EUR";
+  targetCurrency: string;
   targetAmountMinor: number;
   exchangeRate: number;
   rateTimestamp: string;
@@ -11,9 +11,10 @@ export interface CurrencyConversionResult {
 }
 
 export interface CurrencyExchangeClient {
-  convertToEur(input: {
+  convert(input: {
     sourceCurrency: string;
     sourceAmountMinor: number;
+    targetCurrency: string;
   }): Promise<CurrencyConversionResult>;
 }
 
@@ -30,12 +31,12 @@ export function createCurrencyExchangeClient(
   const tracer = trace.getTracer("pay-api");
 
   return {
-    async convertToEur(input) {
+    async convert(input) {
       return tracer.startActiveSpan("currency-exchange.convert", async (span) => {
         try {
           const query = new URLSearchParams({
             from: input.sourceCurrency,
-            to: "EUR",
+            to: input.targetCurrency,
             amountMinor: input.sourceAmountMinor.toString()
           });
 

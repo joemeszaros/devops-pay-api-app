@@ -6,11 +6,11 @@ import { resetMetrics } from "../src/metrics.js";
 
 function createCurrencyExchangeClientStub(): CurrencyExchangeClient {
   return {
-    async convertToEur(input) {
+    async convert(input) {
       return {
         sourceCurrency: input.sourceCurrency,
         sourceAmountMinor: input.sourceAmountMinor,
-        targetCurrency: "EUR",
+        targetCurrency: input.targetCurrency,
         targetAmountMinor: Math.round(input.sourceAmountMinor * 0.01),
         exchangeRate: 0.01,
         rateTimestamp: "2026-07-03T10:00:00.000Z",
@@ -65,6 +65,7 @@ test("payments quote endpoint validates and returns an installment plan", async 
       payload: {
         amountMinor: 15_001,
         currency: "HUF",
+        outputCurrency: "EUR",
         installments: 6
       }
     });
@@ -109,6 +110,7 @@ test("metrics endpoint exposes request counters", async () => {
       payload: {
         amountMinor: 9000,
         currency: "EUR",
+        outputCurrency: "USD",
         installments: 3
       }
     });
@@ -121,6 +123,60 @@ test("metrics endpoint exposes request counters", async () => {
     assert.equal(metricsResponse.statusCode, 200);
     assert.match(metricsResponse.body, /pay_api_http_requests_total 3/);
     assert.match(metricsResponse.body, /pay_api_payment_quotes_total 1/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("payments quote endpoint requires explicit output currency", async () => {
+  resetMetrics();
+  const server = createServer({
+    logLevel: "silent",
+    version: "test",
+    currencyExchangeClient: createCurrencyExchangeClientStub()
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/payments/quote",
+      payload: {
+        amountMinor: 12_000,
+        currency: "USD",
+        installments: 3
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+  } finally {
+    await server.close();
+  }
+});
+
+test("payments quote endpoint accepts non-EUR output currency", async () => {
+  resetMetrics();
+  const server = createServer({
+    logLevel: "silent",
+    version: "test",
+    currencyExchangeClient: createCurrencyExchangeClientStub()
+  });
+
+  try {
+    const response = await server.inject({
+      method: "POST",
+      url: "/payments/quote",
+      payload: {
+        amountMinor: 12_000,
+        currency: "USD",
+        outputCurrency: "GBP",
+        installments: 3
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json();
+    assert.equal(body.sourceCurrency, "USD");
+    assert.equal(body.currency, "GBP");
   } finally {
     await server.close();
   }

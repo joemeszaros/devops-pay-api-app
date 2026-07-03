@@ -9,10 +9,11 @@ const paymentQuoteSchema = {
   body: {
     type: "object",
     additionalProperties: false,
-    required: ["amountMinor", "currency", "installments"],
+    required: ["amountMinor", "currency", "outputCurrency", "installments"],
     properties: {
       amountMinor: { type: "integer", minimum: 1 },
       currency: { type: "string", pattern: "^[A-Z]{3}$" },
+      outputCurrency: { type: "string", pattern: "^[A-Z]{3}$" },
       installments: { type: "integer", enum: [1, 3, 6] }
     }
   }
@@ -71,12 +72,14 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
           span.setAttributes({
             "pay-api.amount_minor": request.body.amountMinor,
             "pay-api.currency": request.body.currency,
+            "pay-api.requested_output_currency": request.body.outputCurrency,
             "pay-api.installments": request.body.installments
           });
 
-          const conversion = await options.currencyExchangeClient.convertToEur({
+          const conversion = await options.currencyExchangeClient.convert({
             sourceCurrency: request.body.currency,
-            sourceAmountMinor: request.body.amountMinor
+            sourceAmountMinor: request.body.amountMinor,
+            targetCurrency: request.body.outputCurrency
           });
 
           const quote = buildQuote(

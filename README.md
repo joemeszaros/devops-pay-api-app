@@ -25,11 +25,12 @@ Példa `POST /payments/quote` kérés:
 {
   "amountMinor": 15001,
   "currency": "HUF",
+  "outputCurrency": "EUR",
   "installments": 6
 }
 ```
 
-A `pay-api` bármilyen hárombetűs pénznemkódot elfogad, de a válasz pénzneme mindig `EUR`. A konverziót a külön `currency-exchange` mikroszolgáltatás végzi HTTP-hívással.
+A `pay-api` bármilyen hárombetűs pénznemkódot elfogad, és a kérésben explicit meg kell adni a kimeneti pénznemet is. A konverziót a külön `currency-exchange` mikroszolgáltatás végzi HTTP-hívással.
 
 ## Helyi futtatás
 
@@ -50,7 +51,7 @@ Példa helyi kérés:
 ```bash
 curl -X POST http://127.0.0.1:3000/payments/quote \
   -H 'content-type: application/json' \
-  -d '{"amountMinor":15001,"currency":"USD","installments":6}'
+  -d '{"amountMinor":15001,"currency":"USD","outputCurrency":"GBP","installments":6}'
 ```
 
 Példa közvetlen árfolyamhívás:

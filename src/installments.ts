@@ -1,6 +1,7 @@
 export interface PaymentQuoteRequest {
   amountMinor: number;
   currency: string;
+  outputCurrency: string;
   installments: 1 | 3 | 6;
 }
 
@@ -27,7 +28,7 @@ export interface PaymentQuoteResponse {
 export interface CurrencyConversion {
   sourceCurrency: string;
   sourceAmountMinor: number;
-  targetCurrency: "EUR";
+  targetCurrency: string;
   targetAmountMinor: number;
   exchangeRate: number;
   rateTimestamp: string;
@@ -63,7 +64,7 @@ export function buildQuote(
     approved: true,
     sourceCurrency: conversion.sourceCurrency,
     sourceAmountMinor: conversion.sourceAmountMinor,
-    currency: conversion.targetCurrency,
+    currency: input.outputCurrency,
     amountMinor: conversion.targetAmountMinor,
     exchangeRate: conversion.exchangeRate,
     exchangeRateTimestamp: conversion.rateTimestamp,
