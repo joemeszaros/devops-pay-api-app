@@ -2,11 +2,11 @@ import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import type { AppConfig } from "./config.js";
+import type { RuntimeConfig } from "./config.js";
 
 let sdk: NodeSDK | null = null;
 
-export async function startTelemetry(config: AppConfig): Promise<void> {
+export async function startTelemetry(config: RuntimeConfig): Promise<void> {
   if (!config.telemetryEnabled || !config.otlpTracesEndpoint) {
     return;
   }

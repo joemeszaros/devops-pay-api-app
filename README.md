@@ -1,17 +1,23 @@
 # pay-api-app
 
-Leegyszerűsített `pay-api` mintaalkalmazás a 12. fejezethez. Ez a repo az alkalmazáskódot, a Docker buildet és a GitHub Actions CI/release pipeline-t tartalmazza.
+Leegyszerűsített mikroszolgáltatásos minta a 12. fejezethez. Ez a repo az alkalmazáskódot, a Docker buildet és a GitHub Actions CI/release pipeline-t tartalmazza.
 
 ## Funkció
 
-Az alkalmazás szándékosan állapotmentes. A cél nem üzleti teljesség, hanem egy kicsi, de valódi REST API végigvitele a teljes DevOps láncon.
+Az alkalmazások szándékosan állapotmentesek. A cél nem üzleti teljesség, hanem egy kicsi, de valódi mikroszolgáltatásos példa végigvitele a teljes DevOps láncon.
 
-Végpontok:
+Szolgáltatások és végpontok:
 
-- `GET /health`
-- `GET /ready`
-- `GET /metrics`
-- `POST /payments/quote`
+- `pay-api`
+  - `GET /health`
+  - `GET /ready`
+  - `GET /metrics`
+  - `POST /payments/quote`
+- `currency-exchange`
+  - `GET /health`
+  - `GET /ready`
+  - `GET /metrics`
+  - `GET /exchange-rates/convert`
 
 Példa `POST /payments/quote` kérés:
 
@@ -23,19 +29,40 @@ Példa `POST /payments/quote` kérés:
 }
 ```
 
+A `pay-api` bármilyen hárombetűs pénznemkódot elfogad, de a válasz pénzneme mindig `EUR`. A konverziót a külön `currency-exchange` mikroszolgáltatás végzi HTTP-hívással.
+
 ## Helyi futtatás
 
 ```bash
 npm install
 npm test
 npm run build
-npm run dev
+
+# 1. terminál
+npm run dev:currency-exchange
+
+# 2. terminál
+CURRENCY_EXCHANGE_BASE_URL=http://127.0.0.1:3100 npm run dev
+```
+
+Példa helyi kérés:
+
+```bash
+curl -X POST http://127.0.0.1:3000/payments/quote \
+  -H 'content-type: application/json' \
+  -d '{"amountMinor":15001,"currency":"USD","installments":6}'
+```
+
+Példa közvetlen árfolyamhívás:
+
+```bash
+curl "http://127.0.0.1:3100/exchange-rates/convert?from=USD&to=EUR&amountMinor=15001"
 ```
 
 ## GitHub Actions logika
 
-- `ci.yml`: PR és `main` build, type check, teszt, Docker smoke build
-- `release.yml`: image push ECR-be, majd PR nyitás a külön GitOps repóba
+- `ci.yml`: PR és `main` build, type check, teszt, két Docker smoke build
+- `release.yml`: a két szolgáltatás image-einek pusholása ECR-be, majd PR nyitás a külön GitOps repóba
 
 ## GitHub beállítások
 

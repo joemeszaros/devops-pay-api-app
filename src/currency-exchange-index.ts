@@ -1,22 +1,18 @@
-import { loadConfig } from "./config.js";
-import { createCurrencyExchangeClient } from "./currency-exchange-client.js";
+import { loadCurrencyExchangeConfig } from "./config.js";
 import { startTelemetry, stopTelemetry } from "./telemetry.js";
 
 async function main(): Promise<void> {
-  const config = loadConfig();
+  const config = loadCurrencyExchangeConfig();
   await startTelemetry(config);
 
-  const { createServer } = await import("./server.js");
-  const server = createServer({
+  const { createCurrencyExchangeServer } = await import("./currency-exchange-server.js");
+  const server = createCurrencyExchangeServer({
     logLevel: config.logLevel,
-    version: config.version,
-    currencyExchangeClient: createCurrencyExchangeClient({
-      baseUrl: config.currencyExchangeBaseUrl
-    })
+    version: config.version
   });
 
   const shutdown = async (signal: string): Promise<void> => {
-    server.log.info({ signal }, "Shutting down pay-api.");
+    server.log.info({ signal }, "Shutting down currency-exchange.");
     await server.close();
     await stopTelemetry();
   };

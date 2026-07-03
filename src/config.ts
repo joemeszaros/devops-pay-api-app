@@ -3,6 +3,7 @@ const DEFAULT_HOST = "0.0.0.0";
 const DEFAULT_LOG_LEVEL = "info";
 const DEFAULT_VERSION = "0.1.0";
 const DEFAULT_TELEMETRY_ENABLED = false;
+const DEFAULT_CURRENCY_EXCHANGE_BASE_URL = "http://127.0.0.1:3100";
 
 function readBoolean(rawValue: string | undefined, defaultValue: boolean): boolean {
   if (rawValue === undefined) {
@@ -25,7 +26,7 @@ function readPort(rawValue: string | undefined): number {
   return parsed;
 }
 
-export interface AppConfig {
+export interface RuntimeConfig {
   host: string;
   port: number;
   logLevel: string;
@@ -34,7 +35,11 @@ export interface AppConfig {
   otlpTracesEndpoint: string | undefined;
 }
 
-export function loadConfig(): AppConfig {
+export interface AppConfig extends RuntimeConfig {
+  currencyExchangeBaseUrl: string;
+}
+
+function loadRuntimeConfig(): RuntimeConfig {
   return {
     host: process.env.HOST ?? DEFAULT_HOST,
     port: readPort(process.env.PORT),
@@ -43,4 +48,16 @@ export function loadConfig(): AppConfig {
     telemetryEnabled: readBoolean(process.env.OTEL_ENABLED, DEFAULT_TELEMETRY_ENABLED),
     otlpTracesEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
   };
+}
+
+export function loadConfig(): AppConfig {
+  return {
+    ...loadRuntimeConfig(),
+    currencyExchangeBaseUrl:
+      process.env.CURRENCY_EXCHANGE_BASE_URL ?? DEFAULT_CURRENCY_EXCHANGE_BASE_URL
+  };
+}
+
+export function loadCurrencyExchangeConfig(): RuntimeConfig {
+  return loadRuntimeConfig();
 }

@@ -26,7 +26,8 @@ jobs:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
       GITOPS_REPOSITORY: ${{ vars.GITOPS_REPOSITORY }}
-      GITOPS_VALUES_FILE: ${{ vars.GITOPS_VALUES_FILE }}
+      PAY_API_VALUES_FILE: ${{ vars.GITOPS_VALUES_FILE }}
+      CURRENCY_EXCHANGE_VALUES_FILE: apps/currency-exchange-prod/values-prod.yaml
 
     steps:
       - name: Checkout app repository
@@ -57,24 +58,39 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push image
-        id: image
+      - name: Build and push images
+        id: images
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
           IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}"
-          docker build -t "${IMAGE_URI}:${IMAGE_TAG}" .
-          docker push "${IMAGE_URI}:${IMAGE_TAG}"
-          DIGEST="$(aws ecr describe-images \
+          PAY_API_TAG="${IMAGE_TAG}-pay-api"
+          CURRENCY_EXCHANGE_TAG="${IMAGE_TAG}-currency-exchange"
+
+          docker build -t "${IMAGE_URI}:${PAY_API_TAG}" .
+          docker push "${IMAGE_URI}:${PAY_API_TAG}"
+
+          docker build -f Dockerfile.currency-exchange -t "${IMAGE_URI}:${CURRENCY_EXCHANGE_TAG}" .
+          docker push "${IMAGE_URI}:${CURRENCY_EXCHANGE_TAG}"
+
+          PAY_API_DIGEST="$(aws ecr describe-images \
             --repository-name "${ECR_REPOSITORY}" \
-            --image-ids imageTag="${IMAGE_TAG}" \
+            --image-ids imageTag="${PAY_API_TAG}" \
             --query 'imageDetails[0].imageDigest' \
             --output text)"
+
+          CURRENCY_EXCHANGE_DIGEST="$(aws ecr describe-images \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${CURRENCY_EXCHANGE_TAG}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+
           echo "repository=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
           echo "tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
-          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "pay_api_digest=${PAY_API_DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "currency_exchange_digest=${CURRENCY_EXCHANGE_DIGEST}" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout GitOps repository
         uses: actions/checkout@v4
@@ -83,30 +99,39 @@ jobs:
           token: ${{ secrets.GITOPS_REPO_TOKEN }}
           path: gitops
 
-      - name: Update GitOps values file
+      - name: Update GitOps values files
         working-directory: gitops
         env:
-          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          VALUES_FILE: ${{ env.GITOPS_VALUES_FILE }}
+          IMAGE_REPOSITORY: ${{ steps.images.outputs.repository }}
+          PAY_API_DIGEST: ${{ steps.images.outputs.pay_api_digest }}
+          CURRENCY_EXCHANGE_DIGEST: ${{ steps.images.outputs.currency_exchange_digest }}
+          PAY_API_VALUES_FILE: ${{ env.PAY_API_VALUES_FILE }}
+          CURRENCY_EXCHANGE_VALUES_FILE: ${{ env.CURRENCY_EXCHANGE_VALUES_FILE }}
         run: |
           set -euo pipefail
-          test -n "${VALUES_FILE}"
-          sed -i.bak -E "s#(^  repository: ).*#\\1${IMAGE_REPOSITORY}#" "${VALUES_FILE}"
-          sed -i.bak -E "s#(^  digest: ).*#\\1${IMAGE_DIGEST}#" "${VALUES_FILE}"
-          rm -f "${VALUES_FILE}.bak"
+          test -n "${PAY_API_VALUES_FILE}"
+          test -n "${CURRENCY_EXCHANGE_VALUES_FILE}"
+
+          sed -i.bak -E "s#(^  repository: ).*#\\1${IMAGE_REPOSITORY}#" "${PAY_API_VALUES_FILE}"
+          sed -i.bak -E "s#(^  digest: ).*#\\1${PAY_API_DIGEST}#" "${PAY_API_VALUES_FILE}"
+
+          sed -i.bak -E "s#(^  repository: ).*#\\1${IMAGE_REPOSITORY}#" "${CURRENCY_EXCHANGE_VALUES_FILE}"
+          sed -i.bak -E "s#(^  digest: ).*#\\1${CURRENCY_EXCHANGE_DIGEST}#" "${CURRENCY_EXCHANGE_VALUES_FILE}"
+
+          rm -f "${PAY_API_VALUES_FILE}.bak" "${CURRENCY_EXCHANGE_VALUES_FILE}.bak"
 
       - name: Create promotion pull request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITOPS_REPO_TOKEN }}
           path: gitops
-          commit-message: "chore(pay-api): promote image ${{ steps.image.outputs.tag }}"
-          branch: "promote/pay-api-${{ steps.image.outputs.tag }}"
+          commit-message: "chore(services): promote image set ${{ steps.images.outputs.tag }}"
+          branch: "promote/services-${{ steps.images.outputs.tag }}"
           delete-branch: true
-          title: "Promote pay-api image ${{ steps.image.outputs.tag }} to prod"
+          title: "Promote pay-api services image set ${{ steps.images.outputs.tag }} to prod"
           body: |
             Automated promotion from the application repository.
 
-            - repository: `${{ steps.image.outputs.repository }}`
-            - digest: `${{ steps.image.outputs.digest }}`
+            - repository: `${{ steps.images.outputs.repository }}`
+            - pay-api digest: `${{ steps.images.outputs.pay_api_digest }}`
+            - currency-exchange digest: `${{ steps.images.outputs.currency_exchange_digest }}`

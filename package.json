@@ -9,8 +9,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:currency-exchange": "tsx watch src/currency-exchange-index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "start:currency-exchange": "node dist/currency-exchange-index.js",
     "lint": "tsc -p tsconfig.check.json --noEmit",
     "test": "node --import tsx --test",
     "test:coverage": "c8 --temp-directory /tmp/pay-api-app-c8 --reports-dir /tmp/pay-api-app-coverage --exclude src/index.ts --exclude src/telemetry.ts --reporter=text --reporter=lcov --lines 80 --functions 80 --branches 70 --statements 80 node --import tsx --test"

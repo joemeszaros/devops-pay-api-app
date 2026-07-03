@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
+import type { CurrencyExchangeClient } from "./currency-exchange-client.js";
 import { buildQuote, type PaymentQuoteRequest } from "./installments.js";
 import { recordHttpRequest, recordPaymentQuoteRequest, renderMetrics } from "./metrics.js";
 
@@ -20,6 +21,7 @@ const paymentQuoteSchema = {
 export interface CreateServerOptions {
   logLevel: string;
   version: string;
+  currencyExchangeClient: CurrencyExchangeClient;
 }
 
 export function createServer(options: CreateServerOptions): FastifyInstance {
@@ -72,15 +74,23 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
             "pay-api.installments": request.body.installments
           });
 
+          const conversion = await options.currencyExchangeClient.convertToEur({
+            sourceCurrency: request.body.currency,
+            sourceAmountMinor: request.body.amountMinor
+          });
+
           const quote = buildQuote(
             request.body,
+            conversion,
             randomUUID(),
             new Date().toISOString()
           );
 
           span.setAttributes({
             "pay-api.approved": quote.approved,
-            "pay-api.request_id": quote.requestId
+            "pay-api.request_id": quote.requestId,
+            "pay-api.output_currency": quote.currency,
+            "pay-api.output_amount_minor": quote.amountMinor
           });
 
           return quote;

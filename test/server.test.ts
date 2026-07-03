@@ -1,13 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { CurrencyExchangeClient } from "../src/currency-exchange-client.js";
 import { createServer } from "../src/server.js";
 import { resetMetrics } from "../src/metrics.js";
+
+function createCurrencyExchangeClientStub(): CurrencyExchangeClient {
+  return {
+    async convertToEur(input) {
+      return {
+        sourceCurrency: input.sourceCurrency,
+        sourceAmountMinor: input.sourceAmountMinor,
+        targetCurrency: "EUR",
+        targetAmountMinor: Math.round(input.sourceAmountMinor * 0.01),
+        exchangeRate: 0.01,
+        rateTimestamp: "2026-07-03T10:00:00.000Z",
+        provider: "currency-exchange"
+      };
+    }
+  };
+}
 
 test("health and readiness endpoints respond successfully", async () => {
   resetMetrics();
   const server = createServer({
     logLevel: "silent",
-    version: "test"
+    version: "test",
+    currencyExchangeClient: createCurrencyExchangeClientStub()
   });
 
   try {
@@ -36,7 +54,8 @@ test("payments quote endpoint validates and returns an installment plan", async 
   resetMetrics();
   const server = createServer({
     logLevel: "silent",
-    version: "test"
+    version: "test",
+    currencyExchangeClient: createCurrencyExchangeClientStub()
   });
 
   try {
@@ -53,7 +72,10 @@ test("payments quote endpoint validates and returns an installment plan", async 
     assert.equal(response.statusCode, 200);
     const body = response.json();
     assert.equal(body.approved, true);
-    assert.equal(body.currency, "HUF");
+    assert.equal(body.sourceCurrency, "HUF");
+    assert.equal(body.sourceAmountMinor, 15_001);
+    assert.equal(body.currency, "EUR");
+    assert.equal(body.exchangeRate, 0.01);
     assert.equal(body.installments, 6);
     assert.equal(body.installmentPlan.length, 6);
     assert.equal(
@@ -61,7 +83,7 @@ test("payments quote endpoint validates and returns an installment plan", async 
         (total: number, line: { amountMinor: number }) => total + line.amountMinor,
         0
       ),
-      15_001
+      150
     );
   } finally {
     await server.close();
@@ -72,7 +94,8 @@ test("metrics endpoint exposes request counters", async () => {
   resetMetrics();
   const server = createServer({
     logLevel: "silent",
-    version: "test"
+    version: "test",
+    currencyExchangeClient: createCurrencyExchangeClientStub()
   });
 
   try {

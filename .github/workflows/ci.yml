@@ -41,5 +41,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Docker build smoke test
-        run: docker build -t pay-api-app:ci .
+      - name: Docker build smoke tests
+        run: |
+          docker build -t pay-api:ci .
+          docker build -f Dockerfile.currency-exchange -t currency-exchange:ci .

@@ -13,11 +13,24 @@ export interface InstallmentLine {
 export interface PaymentQuoteResponse {
   requestId: string;
   approved: boolean;
+  sourceCurrency: string;
+  sourceAmountMinor: number;
   currency: string;
   amountMinor: number;
+  exchangeRate: number;
+  exchangeRateTimestamp: string;
   installments: number;
   installmentPlan: InstallmentLine[];
   calculatedAt: string;
+}
+
+export interface CurrencyConversion {
+  sourceCurrency: string;
+  sourceAmountMinor: number;
+  targetCurrency: "EUR";
+  targetAmountMinor: number;
+  exchangeRate: number;
+  rateTimestamp: string;
 }
 
 export function splitIntoInstallments(
@@ -41,16 +54,21 @@ export function splitIntoInstallments(
 
 export function buildQuote(
   input: PaymentQuoteRequest,
+  conversion: CurrencyConversion,
   requestId: string,
   calculatedAt: string
 ): PaymentQuoteResponse {
   return {
     requestId,
     approved: true,
-    currency: input.currency,
-    amountMinor: input.amountMinor,
+    sourceCurrency: conversion.sourceCurrency,
+    sourceAmountMinor: conversion.sourceAmountMinor,
+    currency: conversion.targetCurrency,
+    amountMinor: conversion.targetAmountMinor,
+    exchangeRate: conversion.exchangeRate,
+    exchangeRateTimestamp: conversion.rateTimestamp,
     installments: input.installments,
-    installmentPlan: splitIntoInstallments(input.amountMinor, input.installments),
+    installmentPlan: splitIntoInstallments(conversion.targetAmountMinor, input.installments),
     calculatedAt
   };
 }
