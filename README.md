@@ -85,6 +85,8 @@ GitHub environment:
 
 Az AWS hitelesítés OIDC-n keresztül történik. A workflow nem közvetlenül deployol EKS-re, hanem a `pay-api-gitops` repóban nyit promóciós PR-t.
 
-## Következő lépés
+## További dokumentáció
 
-A GitHub oldali bekötés lépésenként itt van: [docs/github-setup.md](docs/github-setup.md)
+Az egyetlen, részletes, hallgatóknak szóló útmutató a GitOps repóban található, a `docs/hallgatoi-utmutato.md` fájlban.
+
+Ez az alkalmazásrepó csak a rövid technikai áttekintést és a helyi futtatási példákat tartalmazza.
